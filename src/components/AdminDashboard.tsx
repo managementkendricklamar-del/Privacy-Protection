@@ -9,6 +9,8 @@ import {
   Database, ShieldCheck, CheckCircle2, AlertTriangle, HelpCircle, Eye,
   Copy, Check
 } from 'lucide-react';
+import { collection, onSnapshot, doc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { DemoSubmission } from '../types';
 
 interface CopyButtonProps {
@@ -55,25 +57,98 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [submissions, setSubmissions] = useState<DemoSubmission[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
+  const [secondsSinceLastRefresh, setSecondsSinceLastRefresh] = useState(0);
 
-  // Load submissions from localStorage on mount
+  // Load submissions from Firestore in real-time (onSnapshot)
   useEffect(() => {
-    const loaded = JSON.parse(localStorage.getItem('demo_submissions') || '[]');
-    setSubmissions(loaded);
+    const unsubscribe = onSnapshot(collection(db, 'submissions'), (snapshot) => {
+      const docsData: DemoSubmission[] = [];
+      snapshot.forEach((docSnap) => {
+        docsData.push(docSnap.data() as DemoSubmission);
+      });
+      // Sort desc by parsed numeric timestamp or raw id
+      docsData.sort((a, b) => {
+        const idA = parseInt(a.id.replace('submission_', '')) || 0;
+        const idB = parseInt(b.id.replace('submission_', '')) || 0;
+        return idB - idA;
+      });
+      setSubmissions(docsData);
+      setLastRefreshedAt(new Date());
+      setSecondsSinceLastRefresh(0);
+      // Keep localStorage in sync as a fallback
+      localStorage.setItem('demo_submissions', JSON.stringify(docsData));
+    }, (error) => {
+      console.error('Firestore real-time subscription error:', error);
+      // Fallback to localStorage if offline or permission denied
+      const loaded = JSON.parse(localStorage.getItem('demo_submissions') || '[]');
+      setSubmissions(loaded);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // Delete a single record
-  const handleDelete = (id: string) => {
-    const updated = submissions.filter(item => item.id !== id);
-    setSubmissions(updated);
-    localStorage.setItem('demo_submissions', JSON.stringify(updated));
+  // Auto-refresh the visual timer every second AND run a background sync
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      setSecondsSinceLastRefresh(prev => prev + 1);
+      
+      // Perform an active pull from Firestore every second to meet strict "auto-refresh every second" instruction
+      try {
+        const snapshot = await getDocs(collection(db, 'submissions'));
+        const docsData: DemoSubmission[] = [];
+        snapshot.forEach((docSnap) => {
+          docsData.push(docSnap.data() as DemoSubmission);
+        });
+        docsData.sort((a, b) => {
+          const idA = parseInt(a.id.replace('submission_', '')) || 0;
+          const idB = parseInt(b.id.replace('submission_', '')) || 0;
+          return idB - idA;
+        });
+        setSubmissions(docsData);
+        setLastRefreshedAt(new Date());
+        setSecondsSinceLastRefresh(0);
+      } catch (err) {
+        console.error('Periodic background fetch error:', err);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Delete a single record from both Firestore and state
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'submissions', id));
+      const updated = submissions.filter(item => item.id !== id);
+      setSubmissions(updated);
+      localStorage.setItem('demo_submissions', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to delete from Firestore:', err);
+      // Local fallback
+      const updated = submissions.filter(item => item.id !== id);
+      setSubmissions(updated);
+      localStorage.setItem('demo_submissions', JSON.stringify(updated));
+    }
   };
 
-  // Clear all records
-  const handleClearAll = () => {
+  // Clear all records from both Firestore and local state
+  const handleClearAll = async () => {
     if (window.confirm('Are you sure you want to clear all educational demo submissions? This action is irreversible.')) {
-      setSubmissions([]);
-      localStorage.removeItem('demo_submissions');
+      try {
+        setSubmissions([]);
+        localStorage.removeItem('demo_submissions');
+
+        // Delete from Firestore in batches
+        const snapshot = await getDocs(collection(db, 'submissions'));
+        const batch = writeBatch(db);
+        snapshot.forEach((docRef) => {
+          batch.delete(docRef.ref);
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error('Failed to clear Firestore database collection:', err);
+      }
     }
   };
 
@@ -181,15 +256,22 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
 
           {/* Card 4: System Status */}
           <div className="p-5 rounded-xl border shadow-sm flex items-center gap-3.5 bg-brand-bg-success-light border-brand-border-success-light">
-            <div className="p-2.5 rounded-lg shrink-0 bg-brand-success/10 text-brand-success">
+            <div className="p-2.5 rounded-lg shrink-0 bg-brand-success/10 text-brand-success relative">
               <ShieldCheck className="h-6 w-6" />
+              <span className="absolute top-1 right-1 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
             </div>
             <div>
-              <span className="block font-semibold text-sm text-brand-success">
-                System Secure
+              <span className="block font-semibold text-sm text-brand-success flex items-center gap-1.5">
+                Real-Time Live Feed
               </span>
-              <span className="text-xs text-text-secondary">
-                All credentials captured successfully.
+              <span className="text-xs text-text-secondary block">
+                Auto-refreshed {secondsSinceLastRefresh}s ago
+              </span>
+              <span className="text-[10px] text-brand-primary font-mono block mt-0.5 animate-pulse">
+                ● 1-second database sync active
               </span>
             </div>
           </div>

