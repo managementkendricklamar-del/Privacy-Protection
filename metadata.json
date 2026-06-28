@@ -1,0 +1,6 @@
+{
+  "name": "Google Classic Sign-In Practice",
+  "description": "An educational UI demonstration reproducing the classic Google sign-in layout and spacing with an admin dashboard for practice.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
