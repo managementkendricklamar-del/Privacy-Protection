@@ -18,8 +18,15 @@ export default function App() {
   // Initialize view from URL path
   useEffect(() => {
     const path = window.location.pathname;
+    const isAuth = localStorage.getItem('admin_authenticated') === 'true';
+
     if (path === '/cipher') {
-      setView('admin');
+      if (isAuth) {
+        setView('admin');
+      } else {
+        setView('login');
+        window.history.replaceState({ view: 'login' }, '', '/');
+      }
     } else if (path === '/code') {
       setView('code');
     } else {
@@ -29,8 +36,15 @@ export default function App() {
     // Set up popstate listener for back/forward navigation
     const handlePopState = () => {
       const currentPath = window.location.pathname;
+      const currentAuth = localStorage.getItem('admin_authenticated') === 'true';
+
       if (currentPath === '/cipher') {
-        setView('admin');
+        if (currentAuth) {
+          setView('admin');
+        } else {
+          setView('login');
+          window.history.replaceState({ view: 'login' }, '', '/');
+        }
       } else if (currentPath === '/code') {
         setView('code');
       } else {

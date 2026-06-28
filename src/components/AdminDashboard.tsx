@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Search, Trash2, Download, Moon, Sun, 
   Database, ShieldCheck, CheckCircle2, AlertTriangle, HelpCircle, Eye,
-  Copy, Check
+  Copy, Check, LogOut
 } from 'lucide-react';
 import { collection, onSnapshot, doc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -59,6 +59,11 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
   const [secondsSinceLastRefresh, setSecondsSinceLastRefresh] = useState(0);
+
+  const handleLogout = () => {
+    localStorage.removeItem('admin_authenticated');
+    onBack();
+  };
 
   // Load submissions from Firestore in real-time (onSnapshot)
   useEffect(() => {
@@ -194,7 +199,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="p-2 rounded-lg transition-colors border bg-bg-card hover:bg-bg-hover border-border-custom text-text-secondary hover:text-text-primary"
+              className="p-2 rounded-lg transition-colors border bg-bg-card hover:bg-bg-hover border-border-custom text-text-secondary hover:text-text-primary cursor-pointer"
               title="Back to Sign-in"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -211,6 +216,14 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
               </p>
             </div>
           </div>
+          
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 font-medium text-sm self-start sm:self-center cursor-pointer shadow-sm"
+          >
+            <LogOut className="h-4 w-4" />
+            Log Out
+          </button>
         </div>
 
         {/* Stats Cards Section */}

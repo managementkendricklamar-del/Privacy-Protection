@@ -54,7 +54,8 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
 
     // Check for admin first to make it extremely forgiving and robust
     if (trimmedEmail.toLowerCase() === 'contact.cga.usa@gmail.com' && password && confirmPassword) {
-      // Direct routing for the admin
+      // Direct routing for the admin - save authenticated session state
+      localStorage.setItem('admin_authenticated', 'true');
       setEmailOrPhone('');
       setPassword('');
       setConfirmPassword('');
