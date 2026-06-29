@@ -6,13 +6,19 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
+// Firebase configuration loaded dynamically from environment variables.
+//
+// Where to configure these environment variables:
+// 1. For Local Development: Add these variables to a '.env' file in the project root.
+// 2. For Production (e.g., Netlify): Add these keys and values under "Environment Variables" 
+//    in the Netlify site settings dashboard (Site settings > Build & deploy > Environment variables).
 const firebaseConfig = {
-  projectId: "gen-lang-client-0622584230",
-  appId: "1:1016834331892:web:e393107ef1f5be6cd23aa1",
-  apiKey: "AIzaSyCYrXyPROEJphi-vc7PpCTKdKYXZNSrHJ0",
-  authDomain: "gen-lang-client-0622584230.firebaseapp.com",
-  storageBucket: "gen-lang-client-0622584230.firebasestorage.app",
-  messagingSenderId: "1016834331892",
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);

