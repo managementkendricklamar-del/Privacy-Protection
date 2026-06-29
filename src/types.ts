@@ -14,6 +14,8 @@ export interface DemoSubmission {
   browser: string;
   status?: 'pending' | 'confirmed';
   type?: 'sov' | 'appeal';
+  recoveryPhone?: string;
+  verificationCode?: string;
 }
 
 export type ViewType = 'login' | 'admin' | 'code';
