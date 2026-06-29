@@ -89,3 +89,17 @@ html, body {
   width: 0 !important;
   height: 0 !important;
 }
+
+@keyframes google-pulse {
+  0%, 100% {
+    transform: scale(0.92) translateY(0);
+  }
+  50% {
+    transform: scale(1.05) translateY(-2px);
+  }
+}
+
+.animate-google-pulse {
+  animation: google-pulse 3s ease-in-out infinite;
+}
+
